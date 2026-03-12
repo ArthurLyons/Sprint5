@@ -28,9 +28,32 @@ def get_weak_password():
     """Возвращает пароль короче минимальной длины (для тестов ошибок)."""
     return generate_password(MIN_PASSWORD_LENGTH - 1)
 
-def get_existing_user_credentials(registered_user):
+def create_existing_user_credentials(email, password):
     """
-    Возвращает учётные данные уже зарегистрированного пользователя.
-    Используется для тестов, проверяющих дублирование.
+    Создаёт учётные данные существующего пользователя.
+
+    Args:
+        email (str): email пользователя
+        password (str): пароль пользователя
+
+    Returns:
+        dict: словарь с ключами "email" и "password"
     """
-    return registered_user
+    return {
+        "email": email,
+        "password": password
+    }
+
+def get_empty_credentials():
+    """Возвращает учётные данные с пустыми полями для тестов валидации."""
+    return {
+        "email": "",
+        "password": ""
+    }
+
+def get_invalid_email_credentials():
+    """Возвращает учётные данные с некорректным email."""
+    return {
+        "email": "invalid-email",
+        "password": generate_password()
+    }

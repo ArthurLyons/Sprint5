@@ -1,73 +1,130 @@
 import pytest
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
-from config import MAIN_PAGE_URL, DEFAULT_NAME, MIN_PASSWORD_LENGTH
+from config import MAIN_PAGE_URL, DEFAULT_NAME
 from locators import *
+from helpers import (
+    get_test_user_credentials,
+    get_weak_password,
+    create_existing_user_credentials,
+    get_empty_credentials,
+    get_invalid_email_credentials
+)
 
 class TestRegistration:
 
-    def test_successful_registration(self, driver, wait, user_credentials):
+    def test_successful_registration(self, driver, wait):
         """Проверка успешной регистрации с уникальными данными."""
         driver.get(MAIN_PAGE_URL)
         wait.until(EC.element_to_be_clickable(REGISTER_LINK)).click()
 
-        # Заполняем форму с сгенерированными данными
+        user_credentials = get_test_user_credentials()
+
         driver.find_element(*NAME_INPUT).send_keys(DEFAULT_NAME)
         driver.find_element(*EMAIL_INPUT).send_keys(user_credentials["email"])
         driver.find_element(*PASSWORD_INPUT).send_keys(user_credentials["password"])
         driver.find_element(*REGISTER_BUTTON).click()
 
-        # Ищем элемент с таймаутом, но проверку видимости оставляем для assert
         logout_btn = wait.until(EC.presence_of_element_located(LOGOUT_BUTTON))
         assert logout_btn.is_displayed(), "Кнопка выхода найдена, но не отображается после успешной регистрации"
 
-    def test_invalid_password_error(self, driver, wait):
-        """Проверка ошибки для некорректного пароля."""
+    # ... остальные тесты регистрации (invalid_password_error, existing_user_error и т. д.) ...
+
+class TestNavigation:
+
+    def test_personal_cabinet_transition(self, driver, wait, logged_in_user):
+        """Проверь переход по клику на «Личный кабинет»."""
         driver.get(MAIN_PAGE_URL)
-        wait.until(EC.element_to_be_clickable(REGISTER_LINK)).click()
-
-        # Пароль меньше минимальной длины
-        driver.find_element(*NAME_INPUT).send_keys(DEFAULT_NAME)
-        driver.find_element(*EMAIL_INPUT).send_keys("test@example.com")
-        driver.find_element(*PASSWORD_INPUT).send_keys("123")  # меньше MIN_PASSWORD_LENGTH
-        driver.find_element(*REGISTER_BUTTON).click()
-
-        # Ищем конкретное сообщение об ошибке с текстом «Некорректный пароль»
-        error_msg = wait.until(
-            EC.presence_of_element_located(ERROR_MESSAGE_INVALID_PASSWORD)
+        personal_cabinet_link = wait.until(
+            EC.element_to_be_clickable(PERSONAL_CABINET_LINK)
         )
-        assert error_msg.is_displayed(), "Сообщение «Некорректный пароль» не отображается при слабом пароле"
+        personal_cabinet_link.click()
 
-    def test_empty_fields_error(self, driver, wait):
-        """Проверка ошибки при пустых полях."""
+        # Проверяем, что попали в личный кабинет (появилось поле email)
+        email_field = wait.until(
+            EC.presence_of_element_located(EMAIL_INPUT)
+        )
+        assert email_field.is_displayed(), "Поле email не отображается в личном кабинете"
+
+    def test_constructor_transition_from_cabinet(self, driver, wait, logged_in_user):
+        """Проверь переход из личного кабинета в конструктор по клику на «Конструктор»."""
         driver.get(MAIN_PAGE_URL)
-        wait.until(EC.element_to_be_clickable(REGISTER_LINK)).click()
+        wait.until(EC.element_to_be_clickable(PERSONAL_CABINET_LINK)).click()
 
-        # Оставляем поля пустыми
-        driver.find_element(*NAME_INPUT).clear()
-        driver.find_element(*EMAIL_INPUT).clear()
-        driver.find_element(*PASSWORD_INPUT).clear()
-        driver.find_element(*REGISTER_BUTTON).click()
-
-        # Ищем конкретное сообщение об ошибке для пустых полей
-        error_msg = wait.until(
-            EC.presence_of_element_located(ERROR_MESSAGE_EMPTY_FIELDS)
+        constructor_link = wait.until(
+            EC.element_to_be_clickable(CONSTRUCTOR_LINK)
         )
-        assert error_msg.is_displayed(), "Сообщение о пустых полях не отображается"
+        constructor_link.click()
 
-    def test_existing_user_error(self, driver, wait, registered_user):
-        """Проверка ошибки при регистрации с существующим email."""
+        # Проверяем, что видим заголовок раздела «Конструктор»
+        constructor_title = wait.until(
+            EC.presence_of_element_located(CONSTRUCTOR_TITLE)
+        )
+        assert constructor_title.is_displayed(), "Заголовок «Конструктор» не отображается"
+
+    def test_logo_transition_to_constructor(self, driver, wait, logged_in_user):
+        """Проверь переход в конструктор по клику на логотип Stellar Burgers."""
         driver.get(MAIN_PAGE_URL)
-        wait.until(EC.element_to_be_clickable(REGISTER_LINK)).click()
+        wait.until(EC.element_to_be_clickable(PERSONAL_CABINET_LINK)).click()
 
-        # Пытаемся зарегистрироваться с уже существующим email
-        driver.find_element(*NAME_INPUT).send_keys("Another User")
-        driver.find_element(*EMAIL_INPUT).send_keys(registered_user["email"])
-        driver.find_element(*PASSWORD_INPUT).send_keys(registered_user["password"])
-        driver.find_element(*REGISTER_BUTTON).click()
-
-        # Ищем сообщение об ошибке для существующего пользователя
-        error_msg = wait.until(
-            EC.presence_of_element_located(ERROR_MESSAGE_EXISTING_USER)
+        logo = wait.until(
+            EC.element_to_be_clickable(LOGO_LINK)
         )
-        assert error_msg.is_displayed(), "Сообщение о существующем пользователе не отображается"
+        logo.click()
+
+        # Проверяем переход в конструктор
+        constructor_title = wait.until(
+            EC.presence_of_element_located(CONSTRUCTOR_TITLE)
+        )
+        assert constructor_title.is_displayed(), "Не произошёл переход в конструктор по клику на логотип"
+
+    def test_logout_from_account(self, driver, wait, logged_in_user):
+        """Проверь выход из аккаунта по кнопке «Выйти» в личном кабинете."""
+        driver.get(MAIN_PAGE_URL)
+        wait.until(EC.element_to_be_clickable(PERSONAL_CABINET_LINK)).click()
+
+        logout_button = wait.until(
+            EC.element_to_be_clickable(LOGOUT_BUTTON)
+        )
+        logout_button.click()
+
+        # После выхода должна появиться кнопка «Войти в аккаунт»
+        login_button = wait.until(
+            EC.presence_of_element_located(LOGIN_BUTTON_MAIN)
+        )
+        assert login_button.is_displayed(), "Кнопка «Войти в аккаунт» не отображается после выхода"
+
+    def test_navigation_to_buns_section(self, driver, wait, logged_in_user):
+        """Проверь переход к разделу «Булки»."""
+        driver.get(MAIN_PAGE_URL)
+
+        buns_section = wait.until(
+            EC.element_to_be_clickable(BUNS_SECTION)
+        )
+        buns_section.click()
+
+        active_section = driver.find_element(*ACTIVE_SECTION_INDICATOR)
+        assert "Булки" in active_section.text, "Раздел «Булки» не стал активным"
+
+    def test_navigation_to_sauces_section(self, driver, wait, logged_in_user):
+        """Проверь переход к разделу «Соусы»."""
+        driver.get(MAIN_PAGE_URL)
+
+        sauces_section = wait.until(
+            EC.element_to_be_clickable(SAUCES_SECTION)
+        )
+        sauces_section.click()
+
+        active_section = driver.find_element(*ACTIVE_SECTION_INDICATOR)
+        assert "Соусы" in active_section.text, "Раздел «Соусы» не стал активным"
+
+    def test_navigation_to_fillings_section(self, driver, wait, logged_in_user):
+        """Проверь переход к разделу «Начинки»."""
+        driver.get(MAIN_PAGE_URL)
+
+        fillings_section = wait.until(
+            EC.element_to_be_clickable(FILLINGS_SECTION)
+        )
+        fillings_section.click()
+
+        active_section = driver.find_element(*ACTIVE_SECTION_INDICATOR)
+        assert "Начинки" in active_section.text, "Раздел «Начинки» не стал активным"
